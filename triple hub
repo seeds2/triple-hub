@@ -279,42 +279,6 @@ RunService.RenderStepped:Connect(function()
 end)
 
 
-local TOOL_NAME = "Throwing Knife"
-local SIDEWAYS_FORCE = 350
-local UPWARD_FORCE = 50
-local WALL_CHECK_DISTANCE = 1
-local WALL_SLIDE_SPEED = 200
-local DOUBLE_JUMP_KEY = Enum.KeyCode.Q
-local DOUBLE_JUMP_COOLDOWN = 2
-
-local mouse = player:GetMouse()
-local isEquipped = false
-local canDoubleJump = true
-local wallSliding = false
-
-local function launchUpAndSideways()
-	local char = player.Character
-	if not char then return end
-	local root = char:FindFirstChild("HumanoidRootPart")
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not root or not humanoid then return end
-	local camera = workspace.CurrentCamera
-	local rightVec = camera.CFrame.RightVector
-	root.Velocity = (rightVec * SIDEWAYS_FORCE) + Vector3.new(0, UPWARD_FORCE, 0)
-end
-
-local function handleTool(character)
-	character.ChildAdded:Connect(function(tool)
-		if tool:IsA("Tool") and tool.Name == TOOL_NAME then
-			tool.Equipped:Connect(function()
-				isEquipped = true
-			end)
-			tool.Unequipped:Connect(function()
-				isEquipped = false
-			end)
-		end
-	end)
-end
 
 local function isTouchingWall(root)
 	local forward = root.CFrame.LookVector
