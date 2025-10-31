@@ -1,33 +1,3 @@
-local player = game.Player
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "HitboxLauncherGUI"
-screenGui.Parent = playerGui
-screenGui.ResetOnSpawn = false
-
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 100)
-frame.Position = UDim2.new(0.5, -125, 0.5, -50)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
-
--- Create Button
-local launchButton = Instance.new("TextButton")
-launchButton.Size = UDim2.new(0, 200, 0, 50)
-launchButton.Position = UDim2.new(0.5, -100, 0.5, -25)
-launchButton.Text = "Load Hitbox Script"
-launchButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-launchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-launchButton.Font = Enum.Font.SourceSansBold
-launchButton.TextSize = 18
-launchButton.Parent = frame
-
-launchButton.MouseButton1Click:Connect(function()
-    
-    screenGui:Destroy()
 
 local ScreenGui = Instance.new("ScreenGui")
 local main = Instance.new("Frame")
@@ -361,9 +331,4 @@ pcall(function()
     })
 end)
 
-end)
-
-
-   
-    loadstring(hitboxScript)()
 end)
