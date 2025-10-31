@@ -1,4 +1,3 @@
-
 local player = game.Player
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HitboxLauncherGUI"
@@ -29,26 +28,6 @@ launchButton.Parent = frame
 launchButton.MouseButton1Click:Connect(function()
     
     screenGui:Destroy()
-
-    local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-local screenGui = Instance.new("ScreenGui")
-local textLabel = Instance.new("TextLabel")
-
-screenGui.Name = "CenteredTextGui"
-screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-
-textLabel.Size = UDim2.new(0.5, 0, 0.1, 0) -- 50% width, 10% height
-textLabel.Position = UDim2.new(0.25, 0, 0.45, 0) -- Centered
-textLabel.BackgroundTransparency = 1 -- No background
-textLabel.Text = "Malfunction! Please contact @egoistic.reborn immediately!"
-textLabel.TextSize = 36
-textLabel.TextColor3 = Color3.new(1, 1, 1)
-textLabel.TextStrokeTransparency = 0
-textLabel.Parent = screenGui
-
-wait(5)
 
 local ScreenGui = Instance.new("ScreenGui")
 local main = Instance.new("Frame")
