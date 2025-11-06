@@ -380,5 +380,215 @@ task.wait(2)
 MainFrame.Visible = true
 ToggleBtn.Visible = true
 
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- Lock-on System
+local LockOn = {
+    Enabled = false,
+    Target = nil,
+    TargetUsername = "",
+    Smoothness = 0.15,
+    FOV = 30,
+    CircleColor = Color3.fromRGB(255, 0, 0),
+    CircleThickness = 2,
+    ShowName = true
+}
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LockOnGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 140)
+MainFrame.Position = UDim2.new(0.5, -150, 1, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundTransparency = 1
+Title.Text = "Lock-On Target"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(0.7, 0, 0, 35)
+InputBox.Position = UDim2.new(0.15, 0, 0.3, 0)
+InputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+InputBox.PlaceholderText = "Enter username..."
+InputBox.Text = ""
+InputBox.TextColor3 = Color3.new(1, 1, 1)
+InputBox.Font = Enum.Font.Gotham
+InputBox.TextSize = 16
+InputBox.Parent = MainFrame
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 8)
+InputCorner.Parent = InputBox
+
+local LockButton = Instance.new("TextButton")
+LockButton.Size = UDim2.new(0.25, 0, 0, 35)
+LockButton.Position = UDim2.new(0.73, -5, 0.3, 0)
+LockButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+LockButton.Text = "Lock"
+LockButton.TextColor3 = Color3.new(1, 1, 1)
+LockButton.Font = Enum.Font.GothamBold
+LockButton.TextSize = 16
+LockButton.Parent = MainFrame
+
+local LockCorner = Instance.new("UICorner")
+LockCorner.CornerRadius = UDim.new(0, 8)
+LockCorner.Parent = LockButton
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 25)
+StatusLabel.Position = UDim2.new(0, 10, 0.65, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Status: Idle"
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 14
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = MainFrame
+
+local ToggleKeyLabel = Instance.new("TextLabel")
+ToggleKeyLabel.Size = UDim2.new(1, -20, 0, 20)
+ToggleKeyLabel.Position = UDim2.new(0, 10, 0.85, 0)
+ToggleKeyLabel.BackgroundTransparency = 1
+ToggleKeyLabel.Text = "Press T to toggle lock"
+ToggleKeyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ToggleKeyLabel.Font = Enum.Font.Gotham
+ToggleKeyLabel.TextSize = 12
+ToggleKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+ToggleKeyLabel.Parent = MainFrame
+
+-- FOV Circle
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Radius = LockOn.FOV
+FOVCircle.Color = LockOn.CircleColor
+FOVCircle.Thickness = LockOn.CircleThickness
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+-- Functions
+local function FindPlayerByName(name)
+    name = name:lower()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():sub(1, #name) == name or player.DisplayName:lower():sub(1, #name) == name then
+            return player
+        end
+    end
+    return nil
+end
+
+local function UpdateLock()
+    if not LockOn.Enabled or not LockOn.Target or not LockOn.Target.Character then
+        LockOn.Enabled = false
+        StatusLabel.Text = "Status: Not locked"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        FOVCircle.Visible = false
+        return
+    end
+
+    local Character = LockOn.Target.Character
+    local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+    local Head = Character:FindFirstChild("Head")
+    
+    if not HumanoidRootPart or not Head then return end
+
+    local ScreenPos, OnScreen = Camera:WorldToViewportPoint(HumanoidRootPart.Position)
+    
+    if OnScreen then
+        FOVCircle.Position = Vector2.new(ScreenPos.X, ScreenPos.Y)
+        FOVCircle.Visible = true
+        StatusLabel.Text = "Locked: " .. LockOn.Target.DisplayName
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        
+        -- Smooth camera lock
+        local TargetCFrame = CFrame.new(Camera.CFrame.Position, Head.Position)
+        Camera.CFrame = Camera.CFrame:Lerp(TargetCFrame, LockOn.Smoothness)
+    else
+        FOVCircle.Visible = false
+        StatusLabel.Text = "Target off-screen"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    end
+end
+
+-- Input Handling
+LockButton.MouseButton1Click:Connect(function()
+    local name = InputBox.Text:gsub("^%s*(.-)%s*$", "%1")
+    if name == "" then
+        StatusLabel.Text = "Enter a username!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
+    end
+
+    local target = FindPlayerByName(name)
+    if target and target.Character then
+        LockOn.Target = target
+        LockOn.TargetUsername = name
+        LockOn.Enabled = true
+        StatusLabel.Text = "Locked: " .. target.DisplayName
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        InputBox.Text = target.Name
+    else
+        StatusLabel.Text = "Player not found!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        if LockOn.Target then
+            LockOn.Enabled = not LockOn.Enabled
+            FOVCircle.Visible = LockOn.Enabled
+            StatusLabel.Text = LockOn.Enabled and ("Locked: " .. LockOn.Target.DisplayName) or "Lock paused"
+            StatusLabel.TextColor3 = LockOn.Enabled and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 200, 100)
+        end
+    end
+end)
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+    if LockOn.Enabled then
+        UpdateLock()
+    end
+end)
+
+-- Auto-reconnect on respawn
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if LockOn.Target == player then
+            task.wait(1)
+            LockOn.Enabled = true
+        end
+    end)
+end)
+
+print("Lock-On GUI Loaded!")
+print("Enter username → Click Lock → Press T to toggle")
+
 print("Meow's Ultimate Hub loaded!")
 print("Launch: Space (only when Throwing Knife equipped) | Double Jump: Mobile button")
+
+
