@@ -20,13 +20,6 @@ local CONFIG = {
     TOOLS = {"C4", "Grenade", "Throwing Knife"}
 }
 
-local Keybinds = {
-    DOUBLE_JUMP = Enum.KeyCode.Q,
-    LAUNCH = Enum.KeyCode.Five,
-    WALLSLIDE = Enum.KeyCode.LeftShift,
-    GUI_TOGGLE = Enum.KeyCode.G
-}
-
 _G.HeadSize = CONFIG.HITBOX_SIZE
 _G.Disabled = false
 
@@ -181,17 +174,7 @@ local function setupInput()
     inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
         
-        if input.KeyCode == Keybinds.GUI_TOGGLE then
-            states.guiVisible = not states.guiVisible
-            MainFrame.Visible = states.guiVisible
-        elseif input.KeyCode == Keybinds.DOUBLE_JUMP then
-            performDoubleJump()
-        elseif input.KeyCode == Keybinds.LAUNCH then
-            launchPlayer()
-        elseif input.KeyCode == Keybinds.WALLSLIDE then
-            local char = player.Character
-            if char then setupWallslide(char) end
-        elseif input.KeyCode == Enum.KeyCode.Space and states.isEquipped then
+        if input.KeyCode == Enum.KeyCode.Space and states.isEquipped then
             launchPlayer()
         end
     end)
@@ -225,7 +208,7 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 24
 Title.Parent = MainFrame
 
-local Tabs = {"Movement", "Visuals", "Weapons", "Keybinds"}
+local Tabs = {"Movement", "Visuals", "Weapons"}
 local CurrentTab = "Movement"
 local TabFrames = {}
 local TabButtons = {}
@@ -360,64 +343,6 @@ emeraldBtn.TextSize = 16
 emeraldBtn.Parent = TabFrames["Weapons"]
 emeraldBtn.MouseButton1Click:Connect(function() selectWeapon("Emerald Greatsword") end)
 
-local keybindLabels = {}
-local awaitingKeybind = nil
-
-local function createKeybindRow(action, key, yPos)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 40)
-    frame.Position = UDim2.new(0, 0, 0, yPos)
-    frame.BackgroundTransparency = 1
-    frame.Parent = TabFrames["Keybinds"]
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = action .. ":"
-    label.TextColor3 = Color3.new(1,1,1)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 16
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
-    
-    local keyBtn = Instance.new("TextButton")
-    keyBtn.Size = UDim2.new(0.3, 0, 0.8, 0)
-    keyBtn.Position = UDim2.new(0.45, 0, 0.1, 0)
-    keyBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    keyBtn.Text = key.Name
-    keyBtn.TextColor3 = Color3.new(1,1,1)
-    keyBtn.Font = Enum.Font.GothamBold
-    keyBtn.TextSize = 14
-    keyBtn.Parent = frame
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = keyBtn
-    
-    keyBtn.MouseButton1Click:Connect(function()
-        keyBtn.Text = "..."
-        keyBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-        awaitingKeybind = action
-    end)
-    
-    keybindLabels[action] = keyBtn
-end
-
-createKeybindRow("Double Jump", Keybinds.DOUBLE_JUMP, 5)
-createKeybindRow("Launch", Keybinds.LAUNCH, 55)
-createKeybindRow("Wallslide", Keybinds.WALLSLIDE, 105)
-createKeybindRow("Toggle GUI", Keybinds.GUI_TOGGLE, 155)
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if awaitingKeybind and input.KeyCode ~= Enum.KeyCode.Unknown then
-        Keybinds[awaitingKeybind] = input.KeyCode
-        keybindLabels[awaitingKeybind].Text = input.KeyCode.Name
-        keybindLabels[awaitingKeybind].BackgroundColor3 = Color3.fromRGB(60,60,60)
-        awaitingKeybind = nil
-    end
-end)
-
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 60, 0, 30)
 ToggleBtn.Position = UDim2.new(0, 20, 0, 20)
@@ -456,4 +381,4 @@ MainFrame.Visible = true
 ToggleBtn.Visible = true
 
 print("Meow's Ultimate Hub loaded!")
-print("Double Jump: Q | Launch: 5 (or Space with Throwing Knife) | Mobile button added")
+print("Launch: Space (only when Throwing Knife equipped) | Double Jump: Mobile button")
