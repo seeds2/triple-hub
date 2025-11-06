@@ -1,0 +1,459 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local mouse = player:GetMouse()
+
+local CONFIG = {
+    SIDEWAYS_FORCE = 350,
+    UPWARD_FORCE = 80,
+    WALL_SLIDE_SPEED = 16,
+    DOUBLE_JUMP_COOLDOWN = 0.3,
+    LAUNCH_COOLDOWN = 0.2,
+    
+    HITBOX_SIZE = 50,
+    WALL_CHECK_DISTANCE = 5,
+    
+    TOOLS = {"C4", "Grenade", "Throwing Knife"}
+}
+
+local Keybinds = {
+    DOUBLE_JUMP = Enum.KeyCode.Q,
+    LAUNCH = Enum.KeyCode.Five,
+    WALLSLIDE = Enum.KeyCode.LeftShift,
+    GUI_TOGGLE = Enum.KeyCode.G
+}
+
+_G.HeadSize = CONFIG.HITBOX_SIZE
+_G.Disabled = false
+
+local states = {
+    canDoubleJump = true,
+    isWallSliding = false,
+    guiVisible = true,
+    lastDoubleJump = 0,
+    lastLaunch = 0,
+    isEquipped = false
+}
+
+local function safeWait(time)
+    local start = tick()
+    repeat task.wait() until tick() - start >= time
+end
+
+local function launchPlayer()
+    if tick() - states.lastLaunch < CONFIG.LAUNCH_COOLDOWN then return end
+    states.lastLaunch = tick()
+    
+    local char = player.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid then return end
+    
+    local camera = workspace.CurrentCamera
+    local rightVec = camera.CFrame.RightVector
+    
+    root.Velocity = (rightVec * (_G.SIDEWAYS_FORCE or CONFIG.SIDEWAYS_FORCE)) + Vector3.new(0, (_G.UPWARD_FORCE or CONFIG.UPWARD_FORCE), 0)
+end
+
+local function performDoubleJump()
+    if tick() - states.lastDoubleJump < CONFIG.DOUBLE_JUMP_COOLDOWN or not states.canDoubleJump then return end
+    states.lastDoubleJump = tick()
+    states.canDoubleJump = false
+    
+    local char = player.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    safeWait(0.1)
+    
+    for _, tool in ipairs(player.Backpack:GetChildren()) do
+        if (tool.Name == "C4" or tool.Name == "Grenade") and tool:FindFirstChild("RemoteEvent") then
+            tool.Parent = char
+            safeWait()
+            humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+            safeWait(0.1)
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            if tool.Name == "C4" then
+                tool.RemoteEvent:FireServer(mouse.Hit.LookVector)
+            else
+                tool:Activate()
+            end
+            tool.Parent = player.Backpack
+        end
+    end
+    
+    task.delay(CONFIG.DOUBLE_JUMP_COOLDOWN, function() states.canDoubleJump = true end)
+end
+
+local function isTouchingWall(root)
+    local forward = root.CFrame.LookVector
+    local rayOrigin = root.Position + Vector3.new(0, 2, 0)
+    local rayDirection = forward * CONFIG.WALL_CHECK_DISTANCE
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {root.Parent}
+    
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    return raycastResult ~= nil
+end
+
+RunService.RenderStepped:Connect(function()
+    if _G.Disabled then return end
+    
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and targetPlayer.Character then
+            local hrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                pcall(function()
+                    hrp.Size = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
+                    hrp.Transparency = 0.7
+                    hrp.BrickColor = BrickColor.new("Really red")
+                    hrp.Material = Enum.Material.Neon
+                    hrp.CanCollide = false
+                end)
+            end
+        end
+    end
+end)
+
+local wallslideConnection
+local function setupWallslide(character)
+    if wallslideConnection then wallslideConnection:Disconnect() end
+    
+    local humanoid = character:WaitForChild("Humanoid")
+    local root = character:WaitForChild("HumanoidRootPart")
+    
+    wallslideConnection = RunService.RenderStepped:Connect(function()
+        local humanoidState = humanoid:GetState()
+        if humanoidState == Enum.HumanoidStateType.Freefall and isTouchingWall(root) and not states.isWallSliding then
+            states.isWallSliding = true
+            local rightVec = root.CFrame.RightVector
+            root.Velocity = Vector3.new(rightVec.X * CONFIG.WALL_SLIDE_SPEED, root.Velocity.Y, rightVec.Z * CONFIG.WALL_SLIDE_SPEED)
+        elseif not isTouchingWall(root) or humanoidState ~= Enum.HumanoidStateType.Freefall then
+            states.isWallSliding = false
+        end
+    end)
+    
+    humanoid.Died:Connect(function() 
+        if wallslideConnection then wallslideConnection:Disconnect() end 
+    end)
+end
+
+local function handleTool(character)
+    character.ChildAdded:Connect(function(tool)
+        if tool:IsA("Tool") and tool.Name == "Throwing Knife" then
+            tool.Equipped:Connect(function()
+                states.isEquipped = true
+            end)
+            tool.Unequipped:Connect(function()
+                states.isEquipped = false
+            end)
+        end
+    end)
+end
+
+local mobileButton
+local function createMobileButton()
+    if UserInputService.TouchEnabled and not mobileButton then
+        mobileButton = Instance.new("TextButton")
+        mobileButton.Size = UDim2.new(0, 120, 0, 50)
+        mobileButton.Position = UDim2.new(1, -130, 1, -70)
+        mobileButton.Text = "Double Jump"
+        mobileButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        mobileButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        mobileButton.Font = Enum.Font.GothamBold
+        mobileButton.Parent = playerGui
+        mobileButton.MouseButton1Click:Connect(performDoubleJump)
+    end
+end
+
+local inputConnection
+local function setupInput()
+    if inputConnection then inputConnection:Disconnect() end
+    
+    inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        
+        if input.KeyCode == Keybinds.GUI_TOGGLE then
+            states.guiVisible = not states.guiVisible
+            MainFrame.Visible = states.guiVisible
+        elseif input.KeyCode == Keybinds.DOUBLE_JUMP then
+            performDoubleJump()
+        elseif input.KeyCode == Keybinds.LAUNCH then
+            launchPlayer()
+        elseif input.KeyCode == Keybinds.WALLSLIDE then
+            local char = player.Character
+            if char then setupWallslide(char) end
+        elseif input.KeyCode == Enum.KeyCode.Space and states.isEquipped then
+            launchPlayer()
+        end
+    end)
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MeowMasterHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = playerGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 440, 0, 360)
+MainFrame.Position = UDim2.new(0.5, -220, 0.5, -180)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "Meow's Ultimate Hub"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 24
+Title.Parent = MainFrame
+
+local Tabs = {"Movement", "Visuals", "Weapons", "Keybinds"}
+local CurrentTab = "Movement"
+local TabFrames = {}
+local TabButtons = {}
+
+local function createTabButton(name, posX)
+    local button = Instance.new("TextButton")
+    button.Name = name .. "Button"
+    button.Size = UDim2.new(0, 100, 0, 35)
+    button.Position = UDim2.new(0, posX, 0, 45)
+    button.BackgroundColor3 = CurrentTab == name and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(45, 45, 45)
+    button.Text = name
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 16
+    button.Parent = MainFrame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+    
+    button.MouseButton1Click:Connect(function()
+        CurrentTab = name
+        for tabName, tabBtn in pairs(TabButtons) do
+            tabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        end
+        button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        for tabName, frame in pairs(TabFrames) do
+            frame.Visible = (tabName == name)
+        end
+    end)
+    
+    TabButtons[name] = button
+    return button
+end
+
+for i, tabName in ipairs(Tabs) do
+    local tabFrame = Instance.new("Frame")
+    tabFrame.Name = tabName .. "TabFrame"
+    tabFrame.Size = UDim2.new(1, -20, 1, -90)
+    tabFrame.Position = UDim2.new(0, 10, 0, 85)
+    tabFrame.BackgroundTransparency = 1
+    tabFrame.Visible = (i == 1)
+    tabFrame.Parent = MainFrame
+    TabFrames[tabName] = tabFrame
+    
+    createTabButton(tabName, 15 + (i-1) * 105)
+end
+
+local function createSlider(label, default, min, max, callback, yPos, parentFrame)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 45)
+    frame.Position = UDim2.new(0, 0, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parentFrame
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.4, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label .. ": " .. default
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 14
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = frame
+    
+    local textbox = Instance.new("TextBox")
+    textbox.Size = UDim2.new(0.25, 0, 0.7, 0)
+    textbox.Position = UDim2.new(0.45, 0, 0.15, 0)
+    textbox.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    textbox.TextColor3 = Color3.new(1,1,1)
+    textbox.Font = Enum.Font.Gotham
+    textbox.TextSize = 14
+    textbox.Text = tostring(default)
+    textbox.Parent = frame
+    
+    textbox.FocusLost:Connect(function()
+        local val = math.clamp(tonumber(textbox.Text) or default, min, max)
+        textbox.Text = tostring(val)
+        lbl.Text = label .. ": " .. val
+        callback(val)
+    end)
+end
+
+createSlider("Sideways Force", CONFIG.SIDEWAYS_FORCE, 0, 1000, function(v) _G.SIDEWAYS_FORCE = v end, 5, TabFrames["Movement"])
+createSlider("Upward Force", CONFIG.UPWARD_FORCE, 0, 500, function(v) _G.UPWARD_FORCE = v end, 55, TabFrames["Movement"])
+
+local hitboxToggle = Instance.new("TextButton")
+hitboxToggle.Size = UDim2.new(1, 0, 0, 40)
+hitboxToggle.Position = UDim2.new(0, 0, 0, 5)
+hitboxToggle.Text = "Hitboxes: ON"
+hitboxToggle.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+hitboxToggle.TextColor3 = Color3.new(1,1,1)
+hitboxToggle.Font = Enum.Font.GothamBold
+hitboxToggle.TextSize = 18
+hitboxToggle.Parent = TabFrames["Visuals"]
+
+hitboxToggle.MouseButton1Click:Connect(function()
+    _G.Disabled = not _G.Disabled
+    hitboxToggle.Text = _G.Disabled and "Hitboxes: OFF" or "Hitboxes: ON"
+    hitboxToggle.BackgroundColor3 = _G.Disabled and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(0, 200, 100)
+end)
+
+createSlider("Hitbox Size", CONFIG.HITBOX_SIZE, 10, 200, function(v) _G.HeadSize = v end, 55, TabFrames["Visuals"])
+
+local function selectWeapon(name)
+    local menu = playerGui:FindFirstChild("Menu Screen")
+    if menu and menu:FindFirstChild("RemoteEvent") then
+        menu.RemoteEvent:FireServer(name)
+        menu:Destroy()
+    end
+end
+
+local bloodDaggerBtn = Instance.new("TextButton")
+bloodDaggerBtn.Size = UDim2.new(0.48, 0, 0, 50)
+bloodDaggerBtn.Position = UDim2.new(0, 5, 0, 5)
+bloodDaggerBtn.Text = "Blood Dagger"
+bloodDaggerBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+bloodDaggerBtn.TextColor3 = Color3.new(1,1,1)
+bloodDaggerBtn.Font = Enum.Font.GothamBold
+bloodDaggerBtn.TextSize = 16
+bloodDaggerBtn.Parent = TabFrames["Weapons"]
+bloodDaggerBtn.MouseButton1Click:Connect(function() selectWeapon("Blood Dagger") end)
+
+local emeraldBtn = Instance.new("TextButton")
+emeraldBtn.Size = UDim2.new(0.48, 0, 0, 50)
+emeraldBtn.Position = UDim2.new(0.52, 0, 0, 5)
+emeraldBtn.Text = "Emerald Greatsword"
+emeraldBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+emeraldBtn.TextColor3 = Color3.new(1,1,1)
+emeraldBtn.Font = Enum.Font.GothamBold
+emeraldBtn.TextSize = 16
+emeraldBtn.Parent = TabFrames["Weapons"]
+emeraldBtn.MouseButton1Click:Connect(function() selectWeapon("Emerald Greatsword") end)
+
+local keybindLabels = {}
+local awaitingKeybind = nil
+
+local function createKeybindRow(action, key, yPos)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.Position = UDim2.new(0, 0, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = TabFrames["Keybinds"]
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = action .. ":"
+    label.TextColor3 = Color3.new(1,1,1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 16
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local keyBtn = Instance.new("TextButton")
+    keyBtn.Size = UDim2.new(0.3, 0, 0.8, 0)
+    keyBtn.Position = UDim2.new(0.45, 0, 0.1, 0)
+    keyBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    keyBtn.Text = key.Name
+    keyBtn.TextColor3 = Color3.new(1,1,1)
+    keyBtn.Font = Enum.Font.GothamBold
+    keyBtn.TextSize = 14
+    keyBtn.Parent = frame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = keyBtn
+    
+    keyBtn.MouseButton1Click:Connect(function()
+        keyBtn.Text = "..."
+        keyBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+        awaitingKeybind = action
+    end)
+    
+    keybindLabels[action] = keyBtn
+end
+
+createKeybindRow("Double Jump", Keybinds.DOUBLE_JUMP, 5)
+createKeybindRow("Launch", Keybinds.LAUNCH, 55)
+createKeybindRow("Wallslide", Keybinds.WALLSLIDE, 105)
+createKeybindRow("Toggle GUI", Keybinds.GUI_TOGGLE, 155)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if awaitingKeybind and input.KeyCode ~= Enum.KeyCode.Unknown then
+        Keybinds[awaitingKeybind] = input.KeyCode
+        keybindLabels[awaitingKeybind].Text = input.KeyCode.Name
+        keybindLabels[awaitingKeybind].BackgroundColor3 = Color3.fromRGB(60,60,60)
+        awaitingKeybind = nil
+    end
+end)
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 60, 0, 30)
+ToggleBtn.Position = UDim2.new(0, 20, 0, 20)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+ToggleBtn.Text = "Meow"
+ToggleBtn.TextColor3 = Color3.new(1,1,1)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 20
+ToggleBtn.Parent = ScreenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 15)
+toggleCorner.Parent = ToggleBtn
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    states.guiVisible = not states.guiVisible
+    MainFrame.Visible = states.guiVisible
+end)
+
+local function onCharacterAdded(character)
+    safeWait(1)
+    states.canDoubleJump = true
+    states.isWallSliding = false
+    states.isEquipped = false
+    handleTool(character)
+    setupWallslide(character)
+    setupInput()
+    createMobileButton()
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
+if player.Character then onCharacterAdded(player.Character) end
+
+task.wait(2)
+MainFrame.Visible = true
+ToggleBtn.Visible = true
+
+print("Meow's Ultimate Hub loaded!")
+print("Double Jump: Q | Launch: 5 (or Space with Throwing Knife) | Mobile button added")
