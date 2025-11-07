@@ -1,8 +1,3 @@
---[[
-    Meow's Ultimate Hub v2.2 – XENO-COMPATIBLE
-    • VIP-Only Leaderboard + Hitbox Immunity + Anti-Launch Zone + **User Detector**
---]]
--- ===================== XENO COMPATIBILITY SHIM =====================
 if not Drawing then
     local old = getrenv().Drawing
     if old then
@@ -14,39 +9,34 @@ end
 local function safeDraw(fn, ...)
     return pcall(fn, ...)
 end
--- =================================================================
-local Players          = game:GetService("Players")
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
-local RunService       = game:GetService("RunService")
-local HttpService      = game:GetService("HttpService")
-local Marketplace      = game:GetService("MarketplaceService")
-local player   = Players.LocalPlayer
-local playerGui= player:WaitForChild("PlayerGui")
-local mouse    = player:GetMouse()
--- ====================== VIP CONFIG ======================
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local Marketplace = game:GetService("MarketplaceService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local mouse = player:GetMouse()
 local VIP_USERS = {
-    "zombifiedZan",        -- Main VIP
-    -- "FriendUser1",
+    "zombifiedZan",
 }
--- ====================== MAIN CONFIG ======================
 local CONFIG = {
-    SIDEWAYS_FORCE       = 350,
-    UPWARD_FORCE         = 80,
-    WALL_SLIDE_SPEED     = 16,
+    SIDEWAYS_FORCE = 350,
+    UPWARD_FORCE = 80,
+    WALL_SLIDE_SPEED = 16,
     DOUBLE_JUMP_COOLDOWN = 0.3,
-    LAUNCH_COOLDOWN      = 0.2,
-    HITBOX_SIZE          = 50,
-    WALL_CHECK_DISTANCE  = 5,
+    LAUNCH_COOLDOWN = 0.2,
+    HITBOX_SIZE = 50,
+    WALL_CHECK_DISTANCE = 5,
     ANTI_LAUNCH_DISTANCE = 10,
     TOOLS = {"C4", "Grenade", "Throwing Knife"},
-    LOCKON_SMOOTHNESS    = 0.15,
-    LOCKON_FOV           = 30,
-    LOCKON_KEY           = Enum.KeyCode.T
+    LOCKON_SMOOTHNESS = 0.15,
+    LOCKON_FOV = 30,
+    LOCKON_KEY = Enum.KeyCode.T
 }
-_G.HeadSize  = CONFIG.HITBOX_SIZE
-_G.Disabled  = false
--- ====================== VIP-ONLY LEADERBOARD (Detects ALL Users) ======================
+_G.HeadSize = CONFIG.HITBOX_SIZE
+_G.Disabled = false
 local LEADERBOARD = _G.MeowUsers or {}
 _G.MeowUsers = LEADERBOARD
 local PING_INTERVAL = 30
@@ -56,13 +46,13 @@ local function registerUser()
         return Marketplace:GetProductInfo(game.PlaceId)
     end) and Marketplace:GetProductInfo(game.PlaceId) or {Name = "Unknown"}
     local entry = {
-        Name       = player.Name,
-        Display    = player.DisplayName,
-        UserId     = player.UserId,
-        Place      = game.PlaceId .. " – " .. placeInfo.Name,
-        FirstSeen  = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        LastSeen   = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        IsVIP      = table.find(VIP_USERS, player.Name) ~= nil
+        Name = player.Name,
+        Display = player.DisplayName,
+        UserId = player.UserId,
+        Place = game.PlaceId .. " - " .. placeInfo.Name,
+        FirstSeen = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        LastSeen = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        IsVIP = table.find(VIP_USERS, player.Name) ~= nil
     }
     LEADERBOARD[player.UserId] = entry
     print("[Meow Hub] Registered on leaderboard:", player.Name, "| VIP:", entry.IsVIP)
@@ -87,20 +77,17 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- =================================================================
--- ====================== STATES ======================
 local states = {
     canDoubleJump = true,
     isWallSliding = false,
-    guiVisible    = true,
-    lastDoubleJump= 0,
-    lastLaunch    = 0,
-    isEquipped    = false,
+    guiVisible = true,
+    lastDoubleJump = 0,
+    lastLaunch = 0,
+    isEquipped = false,
     lockOn = {enabled = false, target = nil, fovCircle = nil},
-    nearVIP       = false
+    nearVIP = false
 }
 local isVIP = table.find(VIP_USERS, player.Name) ~= nil
--- ====================== UTILS ======================
 local function safeWait(t)
     local s = tick()
     repeat task.wait() until tick() - s >= t
@@ -112,18 +99,15 @@ local function notify(msg)
         })
     end)
 end
--- ====================== VIP ANTI-LAUNCH DETECTION ======================
 local antiLaunchConn
 local function setupAntiLaunch()
     if antiLaunchConn then antiLaunchConn:Disconnect() end
-    
     antiLaunchConn = RunService.Heartbeat:Connect(function()
         if isVIP then return end
         local char = player.Character
         if not char then return end
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
-        
         states.nearVIP = false
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and table.find(VIP_USERS, p.Name) and p.Character then
@@ -139,13 +123,11 @@ local function setupAntiLaunch()
         end
     end)
 end
--- ====================== MOVEMENT ======================
 local function launchSideways()
     if not isVIP and states.nearVIP then
         notify("Can't launch near VIP! (Stay back!)")
         return
     end
-    
     if tick() - states.lastLaunch < CONFIG.LAUNCH_COOLDOWN then return end
     states.lastLaunch = tick()
     local char = player.Character
@@ -161,7 +143,7 @@ local function performDoubleJump()
     states.lastDoubleJump = tick()
     states.canDoubleJump = false
     local char = player.Character
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
     hum:ChangeState(Enum.HumanoidStateType.Jumping)
     safeWait(0.1)
@@ -191,7 +173,7 @@ end
 local wallConn
 local function setupWallslide(char)
     if wallConn then wallConn:Disconnect() end
-    local hum  = char:WaitForChild("Humanoid")
+    local hum = char:WaitForChild("Humanoid")
     local root = char:WaitForChild("HumanoidRootPart")
     wallConn = RunService.RenderStepped:Connect(function()
         if hum:GetState() == Enum.HumanoidStateType.Freefall and isTouchingWall(root) and not states.isWallSliding then
@@ -204,7 +186,6 @@ local function setupWallslide(char)
         end
     end)
 end
--- ====================== VISUALS (VIP IMMUNITY) ======================
 RunService.RenderStepped:Connect(function()
     if _G.Disabled then return end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -221,18 +202,17 @@ RunService.RenderStepped:Connect(function()
                     end)
                 else
                     pcall(function()
-                        hrp.Size         = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
+                        hrp.Size = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
                         hrp.Transparency = 0.7
-                        hrp.BrickColor   = BrickColor.new("Really red")
-                        hrp.Material     = Enum.Material.Neon
-                        hrp.CanCollide   = false
+                        hrp.BrickColor = BrickColor.new("Really red")
+                        hrp.Material = Enum.Material.Neon
+                        hrp.CanCollide = false
                     end)
                 end
             end
         end
     end
 end)
--- ====================== TOOL & INPUT ======================
 local function handleTool(char)
     char.ChildAdded:Connect(function(tool)
         if tool.Name == "Throwing Knife" then
@@ -265,11 +245,10 @@ local function setupInput()
         end
     end)
 end
--- ====================== LOCK-ON (VIP IMMUNITY) ======================
 local function createFOV()
     local c = Drawing.new("Circle")
     c.Radius = CONFIG.LOCKON_FOV
-    c.Color  = Color3.fromRGB(255,0,0)
+    c.Color = Color3.fromRGB(255,0,0)
     c.Thickness = 2
     c.Filled = false
     c.Transparency = 1
@@ -298,7 +277,7 @@ local function updateLock()
         return
     end
     local char = states.lockOn.target.Character
-    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
     if not hrp or not head then return end
     local sp, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
@@ -313,7 +292,6 @@ local function updateLock()
         if states.lockOn.fovCircle then states.lockOn.fovCircle.Visible = false end
     end
 end
--- ====================== GUI ======================
 local screen = Instance.new("ScreenGui", playerGui)
 screen.Name = "MeowHub"
 screen.ResetOnSpawn = false
@@ -332,7 +310,6 @@ title.Text = "Meow's Ultimate Hub v2.2"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 26
--- Tabs
 local tabs = {"Movement","Visuals","Weapons","Lock-On"}
 if isVIP then table.insert(tabs,"VIP") end
 local current = "Movement"
@@ -362,7 +339,6 @@ for i, name in ipairs(tabs) do
     frame.Visible = i==1
     frames[name] = frame
 end
--- Slider helper
 local function slider(label,def,minn,maxx,cb,y,parent)
     local f = Instance.new("Frame",parent)
     f.Size = UDim2.new(1,0,0,45)
@@ -385,13 +361,11 @@ local function slider(label,def,minn,maxx,cb,y,parent)
         cb(v)
     end)
 end
--- Movement Tab
 slider("Sideways Force",CONFIG.SIDEWAYS_FORCE,0,1000,function(v)_G.SIDEWAYS_FORCE=v end,5,frames["Movement"])
 slider("Upward Force",CONFIG.UPWARD_FORCE,0,500,function(v)_G.UPWARD_FORCE=v end,55,frames["Movement"])
 if not isVIP then
     slider("Anti-Launch Distance",CONFIG.ANTI_LAUNCH_DISTANCE,5,50,function(v)CONFIG.ANTI_LAUNCH_DISTANCE=v end,105,frames["Movement"])
 end
--- Visuals Tab
 local hitboxBtn = Instance.new("TextButton",frames["Visuals"])
 hitboxBtn.Size = UDim2.new(1,0,0,40)
 hitboxBtn.Position = UDim2.new(0,0,0,5)
@@ -403,7 +377,6 @@ hitboxBtn.MouseButton1Click:Connect(function()
     hitboxBtn.BackgroundColor3 = _G.Disabled and Color3.fromRGB(200,50,50) or Color3.fromRGB(0,200,100)
 end)
 slider("Hitbox Size",CONFIG.HITBOX_SIZE,10,200,function(v)_G.HeadSize=v end,55,frames["Visuals"])
--- Weapons Tab
 local function spawnWeapon(name)
     local menu = playerGui:FindFirstChild("Menu Screen")
     if menu and menu:FindFirstChild("RemoteEvent") then
@@ -423,7 +396,6 @@ emerald.Position = UDim2.new(0.52,0,0,5)
 emerald.Text = "Emerald Greatsword"
 emerald.BackgroundColor3 = Color3.fromRGB(0,200,100)
 emerald.MouseButton1Click:Connect(function() spawnWeapon("Emerald Greatsword") end)
--- Lock-On Tab
 local lockFrame = frames["Lock-On"]
 local inputBox = Instance.new("TextBox",lockFrame)
 inputBox.Size = UDim2.new(0.7,0,0,35)
@@ -451,7 +423,6 @@ lockBtn.MouseButton1Click:Connect(function()
         notify("Player not found!")
     end
 end)
--- VIP Tab (User Detector)
 if isVIP then
     local vip = frames["VIP"]
     local vtitle = Instance.new("TextLabel", vip)
@@ -462,21 +433,17 @@ if isVIP then
     vtitle.TextColor3 = Color3.fromRGB(255, 215, 0)
     vtitle.Font = Enum.Font.GothamBold
     vtitle.TextSize = 20
-
-    -- USER DETECTOR
     local detectBox = Instance.new("TextBox", vip)
     detectBox.Size = UDim2.new(0.7, 0, 0, 35)
     detectBox.Position = UDim2.new(0.15, 0, 0, 60)
     detectBox.PlaceholderText = "Username to check..."
     detectBox.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     detectBox.TextColor3 = Color3.new(1, 1, 1)
-
     local detectBtn = Instance.new("TextButton", vip)
     detectBtn.Size = UDim2.new(0.25, 0, 0, 35)
     detectBtn.Position = UDim2.new(0.73, -5, 0, 60)
     detectBtn.Text = "Check"
     detectBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-    
     local resultLabel = Instance.new("TextLabel", vip)
     resultLabel.Size = UDim2.new(1, -20, 0, 60)
     resultLabel.Position = UDim2.new(0, 10, 0, 105)
@@ -487,7 +454,6 @@ if isVIP then
     resultLabel.TextSize = 16
     resultLabel.TextWrapped = true
     resultLabel.TextXAlignment = Enum.TextXAlignment.Left
-
     detectBtn.MouseButton1Click:Connect(function()
         local name = detectBox.Text:gsub("^%s*(.-)%s*$", "%1")
         if name == "" then
@@ -495,17 +461,15 @@ if isVIP then
             resultLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
             return
         end
-
         local target = findPlayer(name)
         if not target then
             resultLabel.Text = "Error: Player not found in game."
             resultLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
             return
         end
-
         local entry = LEADERBOARD[target.UserId]
         if entry then
-            local lastSeen = entry.LastSeen:sub(12, 16) -- HH:MM
+            local lastSeen = entry.LastSeen:sub(12, 16)
             resultLabel.Text = "Success: " .. target.DisplayName .. " is using Meow Hub!\nLast seen: " .. lastSeen .. " UTC"
             resultLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
         else
@@ -513,8 +477,6 @@ if isVIP then
             resultLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         end
     end)
-
-    -- Optional: Auto-refresh result if player joins/leaves
     Players.PlayerAdded:Connect(function(p)
         if p == player then return end
         task.wait(1)
@@ -523,7 +485,6 @@ if isVIP then
         end
     end)
 end
--- Toggle button
 local toggle = Instance.new("TextButton", screen)
 toggle.Size = UDim2.new(0,60,0,30)
 toggle.Position = UDim2.new(0,20,0,20)
@@ -536,7 +497,6 @@ toggle.MouseButton1Click:Connect(function()
     main.Visible = states.guiVisible
 end)
 Instance.new("UICorner",toggle).CornerRadius = UDim.new(0,15)
--- ====================== VIP-ONLY LEADERBOARD GUI ======================
 local function createLeaderboard()
     if not isVIP then
         notify("Leaderboard is VIP-only!")
@@ -629,7 +589,6 @@ local function createLeaderboard()
         end
     end)
 end
--- Leaderboard access (F9 or LB button) – VIP only
 UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end
     if inp.KeyCode == Enum.KeyCode.F9 then
@@ -655,7 +614,6 @@ lbBtn.MouseButton1Click:Connect(function()
         createLeaderboard()
     end
 end)
--- ====================== INIT ======================
 local function onCharAdded(char)
     safeWait(1)
     states.canDoubleJump = true
@@ -679,6 +637,10 @@ UserInputService.InputBegan:Connect(function(i)
     end
 end)
 task.wait(2)
+main.Visible = true
+toggle.Visible = true
+notify("Meow Hub v2.2 Loaded! "..(isVIP and "VIP (User Detector!)" or "Standard"))
+print("Xeno-Ready | User Detector Active | Total Control")
 main.Visible = true
 toggle.Visible = true
 notify("Meow Hub v2.2 Loaded! "..(isVIP and "VIP (User Detector!)" or "Standard"))
